@@ -5,75 +5,146 @@ import PokemonCard from "@components/pokemons/PokemonCard.astro";
 import type { PokemonListResponse } from "@interfaces/pokemon-list.response";
 import Title from "@components/shared/Title.astro";
 
-import {Icon} from 'astro-icon/components'
+import { Icon } from "astro-icon/components";
 
-export const getStaticPaths = (async() => {
+export const getStaticPaths = (async () => {
+    const resp = await fetch("https://pokeapi.co/api/v2/pokemon?limit=151");
+    const { results } = (await resp.json()) as PokemonListResponse;
 
-    const resp = await fetch('https://pokeapi.co/api/v2/pokemon?limit=151');
-    const { results } = await resp.json() as PokemonListResponse
+    return results.map(({ name, url }) => ({
+        params: { name: name },
+        props: { name: name, url: url },
+    }));
 
-    return results.map(({name, url}) => ({
-        params: {name: name},
-        props: {name: name, url: url}
-    }))
-
-    
     // return [
     //     { params:{name: 'bulbasaur'}, props: {name: 'bulbasur',  url: 'https://pokeapi.co/api/v2/pokemon/1/'} },
     //     { params:{name: 'charmander'} , props: {name: 'bulbasur', url: 'https://pokeapi.co/api/v2/pokemon/4/'}  },
     // ];
 }) satisfies GetStaticPaths;
 
-const {name} = Astro.params;
+const { name } = Astro.params;
 
-const {url} = Astro.props
+const { url } = Astro.props;
 
+const id = url.split("/").at(-2);
 
-const id = url.split('/').at(-2);
-
-
-const audioSrc = `https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/${id}.ogg`
-const imgUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`
+const audioSrc = `https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/${id}.ogg`;
+const imgUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
 ---
 
-
-<MainLayout title={`Pokemon - #${id} ${name}`}
-            description=`Informacion sobre el pokemon ${name}`
-            image={imgUrl}>
-
+<MainLayout
+    title={`Pokemon - #${id} ${name}`}
+    description=`Informacion sobre el pokemon ${name}`
+    image={imgUrl}
+>
     <section class="mt-10 mx-10 flex flex-col justify-center items-center">
-
         <div class="flex flex-row">
             <div>
                 <!-- <a href="/">Regresar</a> -->
-                <button class="text-blue-500" onclick="history.back()">Regresar</button>
-    
+                <button class="text-blue-500" onclick="history.back()"
+                    >Regresar</button
+                >
+
                 <Title>{name}</Title>
-                
             </div>
-    
-            <button class="ml-4">
-                <Icon name="heart-outline" size= {50} fill='red'/>
-                <Icon name="heart-fill" size= {50}/>
+
+            <button
+                id="btn-favorite"
+                class="ml-4"
+                data-name={name}
+                data-id={id}
+            >
+                <Icon data-outline  name="heart-outline" size={50} fill="red" />
+                <Icon data-fill class='hidden'name="heart-fill" size={50} />
             </button>
         </div>
 
-        <PokemonCard 
-            name = {name}
-            url ={url}
-            isBig = {true}>
-        </PokemonCard>
+        <PokemonCard name={name} url={url} isBig={true} />
 
         <audio controls class="mt-5">
-            <source src={audioSrc} type="audio/ogg">
+            <source src={audioSrc} type="audio/ogg" />
             Tu navegador no soporta este elemento de audio
         </audio>
     </section>
 </MainLayout>
 
+<script>
+    interface FavoritePokemon {
+        name: string;
+        id: number;
+    }
+
+    const handlePageLoad = () => {
+        let favoritePokemons: FavoritePokemon[] = JSON.parse(
+            localStorage.getItem('favorite') ?? '[]'
+        );
+
+        const btnFavorite = document.querySelector(
+            "#btn-favorite",
+        ) as HTMLButtonElement;
+
+        // Verifica si btnFavorite está definido
+        if (!btnFavorite) return;
+
+        const name = btnFavorite.dataset.name;
+        const id = btnFavorite.dataset.id;
+
+        // Verifica si name e id están definidos
+        if (!name || !id) return;
+
+        const heartOutline = btnFavorite.querySelector('[data-outline]') as HTMLElement;
+        const heartFill = btnFavorite.querySelector('[data-fill]') as HTMLElement;
+
+        // Inicializa el estado del botón según si el Pokémon ya es favorito
+        const isFavorite = favoritePokemons.some(fav => fav.name === name);
+        if (isFavorite) {
+            heartOutline.classList.add('hidden');
+            heartFill.classList.remove('hidden');
+        } else {
+            heartOutline.classList.remove('hidden');
+            heartFill.classList.add('hidden');
+        }
+
+        const toggleFavorite = () => {
+            const isFavorite = favoritePokemons.some(fav => fav.name === name);
+            if (isFavorite) {
+                favoritePokemons = favoritePokemons.filter(fav => fav.name !== name);
+            } else {
+                favoritePokemons.push({
+                    id: +id,
+                    name: name
+                });
+            }
+
+            localStorage.setItem('favorite', JSON.stringify(favoritePokemons));
+
+            if (heartOutline.classList.contains('hidden')) {
+                console.log("Mostrando outline y ocultando fill");
+                heartOutline.classList.remove('hidden');
+                heartFill.classList.add('hidden');
+            } else {
+                console.log("Ocultando outline y mostrando fill");
+                heartOutline.classList.add('hidden');
+                heartFill.classList.remove('hidden');
+            }
+        };
+
+        btnFavorite.addEventListener('click', toggleFavorite);
+    };
+
+    // Ahora, registra el evento DOMContentLoaded
+    document.addEventListener("DOMContentLoaded", handlePageLoad);
+</script>
+
+
+
 
 <style>
     a {
-        @apply hover:underline text-blue-500
+        @apply hover:underline text-blue-500;
+    }
+
+    #btn-favorite {
+        @apply hover:animate-pulse;
     }
 </style>
